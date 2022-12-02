@@ -1,6 +1,8 @@
-.PHONY: clean clean-build clean-pyc clean-test coverage dist docs help install lint lint/flake8
-        {%- if cookiecutter.use_black == 'y' %} lint/black{% endif %}
+.PHONY: clean clean-build clean-pyc clean-test coverage dist docs help install lint check test
+
 .DEFAULT_GOAL := help
+
+APPS_FOLDERS={{ cookiecutter.project_slug }} tests
 
 define BROWSER_PYSCRIPT
 import os, webbrowser, sys
@@ -48,16 +50,6 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr htmlcov/
 	rm -fr .pytest_cache
 
-lint/flake8: ## check style with flake8
-	flake8 {{ cookiecutter.project_slug }} tests
-
-{%- if cookiecutter.use_black == 'y' %}
-lint/black: ## check style with black
-	black --check {{ cookiecutter.project_slug }} tests
-{%- endif %}
-
-lint: lint/flake8{%- if cookiecutter.use_black == 'y' %} lint/black{%- endif %} ## check style
-
 test: ## run tests quickly with the default Python
 {%- if cookiecutter.use_pytest == 'y' %}
 	pytest
@@ -90,7 +82,10 @@ servedocs: docs ## compile the docs watching for changes
 	watchmedo shell-command -p '*.rst' -c '$(MAKE) -C docs html' -R -D .
 
 release: dist ## package and upload a release
-	twine upload dist/*
+	twine upload dist/* --verbose
+
+test-release: dist ## package and upload a release
+	twine upload -r testpypi dist/* --verbose
 
 dist: clean ## builds source and wheel package
 	python setup.py sdist
@@ -99,3 +94,40 @@ dist: clean ## builds source and wheel package
 
 install: clean ## install the package to the active Python's site-packages
 	python setup.py install
+
+lint/isort:
+	isort ${APPS_FOLDERS}
+
+lint/check-isort:
+	isort --df -c ${APPS_FOLDERS}
+
+lint/mypy: ## check types with mypy
+	mypy ${APPS_FOLDERS}
+
+lint/flake8: ## check style with flake8
+	flake8 ${APPS_FOLDERS} -show-source --statistics
+
+lint/black: ## run style fixing with black
+	black ${APPS_FOLDERS}
+
+lint/check-black: ## check style with black
+	black --check ${APPS_FOLDERS}
+
+lint: ## fix style
+	isort ${APPS_FOLDERS}
+	black ${APPS_FOLDERS}
+
+check: ## check style
+	twine check dist/*
+	flake8 ${APPS_FOLDERS}
+	isort --df -c ${APPS_FOLDERS}
+	black --check ${APPS_FOLDERS} 
+	mypy ${APPS_FOLDERS}
+
+# v0.1.0 -> v0.2.0
+bump-minor:
+	bump2version minor
+
+# v0.1.0 -> v0.1.1
+bump-patch:
+	bump2version patch
